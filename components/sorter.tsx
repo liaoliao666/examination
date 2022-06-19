@@ -9,10 +9,7 @@ export default function Sorter({
 }) {
   return (
     <span
-      className={clsx(
-        "inline-flex flex-col items-center text-xs text-black text-opacity-60",
-        className
-      )}
+      className={clsx("inline-flex flex-col items-center text-xs", className)}
     >
       <span
         role="img"

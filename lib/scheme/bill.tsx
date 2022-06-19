@@ -2,7 +2,7 @@ import { Bill, BillType } from "@prisma/client";
 import dayjs from "dayjs";
 import * as yup from "yup";
 
-const orderScheme = yup.mixed().oneOf(["asc", "desc"]);
+const orderScheme = yup.mixed().oneOf(["asc", "desc", null]);
 
 export const searchBillListArgsScheme = yup.object({
   pageIndex: yup.number().required().min(0).integer(),
@@ -35,12 +35,14 @@ export const billDtoScheme = yup.object({
     .transform((value) => (dayjs(value).isValid() ? value : undefined))
     .required("请选择账单时间"),
   categoryId: yup.string(),
-  amount: yup.number().positive("账单金额需大于0").required("请输入账单金额"),
+  amount: yup
+    .number()
+    .typeError("请输入数字")
+    .positive("账单金额需大于0")
+    .required("请输入账单金额"),
 });
 
-export type BillDto = yup.InferType<typeof billDtoScheme>;
-
-export type BillList = {
+export type SearcBillListResponse = {
   list: Bill[];
   pageCount: number;
   totalExpenses: number | null;

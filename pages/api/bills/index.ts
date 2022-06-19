@@ -8,10 +8,10 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const { body, method, query } = req;
+  const { body, method } = req;
 
   switch (method) {
-    case "PUT": {
+    case "POST": {
       const data = await billDtoScheme.validate(body);
 
       const { type, categoryId } = data;
@@ -29,22 +29,14 @@ export default async function handler(
             .send(getCommonServerError("请选择正确的账单分类"));
       }
 
-      const result = await prisma.bill.update({
+      const result = await prisma.bill.create({
         data,
-        where: { id: query.id as string },
-      });
-      res.status(200).json(result);
-      break;
-    }
-    case "DELETE": {
-      const result = await prisma.bill.delete({
-        where: { id: query.id as string },
       });
       res.status(200).json(result);
       break;
     }
     default:
-      res.setHeader("Allow", ["POST", "PUT"]);
+      res.setHeader("Allow", ["POST"]);
       res.status(405).end(`Method ${method} Not Allowed`);
   }
 }

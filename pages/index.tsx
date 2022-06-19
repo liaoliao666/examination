@@ -6,7 +6,7 @@ import {
   useTableInstance,
 } from "@tanstack/react-table";
 import { Bill, BillType } from "@prisma/client";
-import { useCallback, useMemo, useReducer } from "react";
+import { useCallback, useMemo, useReducer, useState } from "react";
 import { dehydrate, QueryClient, useQuery } from "react-query";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { ErrorMessage } from "@hookform/error-message";
@@ -18,15 +18,23 @@ import {
   billTypeOptions,
   SearchBillListArgs,
   searchBillListArgsScheme,
-} from "services/bill/scheme";
+} from "lib/scheme/bill";
 import { CategoryKeys, CategoryService } from "services/category";
 import { find, isEqual, omit } from "lodash-es";
-import Select from "react-select";
 import Sorter from "components/sorter";
+import CreateBillForm from "components/bill/create-bill-form";
+import StyledSelect from "components/styled-select";
+import clsx from "clsx";
+import UpdateBillForm from "components/bill/update-bill-form";
+import DeleteBillButton from "components/bill/delete-bill-button";
+import Pagination from "components/pagination";
 
 const defaultValues = {
   pageIndex: 0,
   pageSize: 10,
+  orderBy: {
+    time: "desc",
+  },
 } as SearchBillListArgs;
 
 const table = createTable().setRowType<Bill>();
@@ -86,6 +94,25 @@ const Home: NextPage = () => {
     CategoryService.list()
   );
 
+  // 新增账单
+  const [createBillVisible, setCreateBillVisible] = useState(false);
+
+  // 修改账单
+  const [updateBillInfo, setUpdateBillInfo] = useState<{
+    open: boolean;
+    defaultValues?: Bill;
+  }>({
+    open: false,
+  });
+
+  // 删除账单
+  const [deleteBillInfo, setDeleteBillInfo] = useState<{
+    open: boolean;
+    defaultValues?: Bill;
+  }>({
+    open: false,
+  });
+
   // 表格
   const [pageIndex, pageSize] = useWatch({
     control,
@@ -117,12 +144,10 @@ const Home: NextPage = () => {
               return (
                 <div
                   onClick={() => {
-                    onChange(
-                      !value ? "asc" : value === "asc" ? "desc" : undefined
-                    );
+                    onChange(!value ? "asc" : value === "asc" ? "desc" : null);
                     submit();
                   }}
-                  className="flex cursor-pointer text-black hover:text-opacity-60"
+                  className="flex cursor-pointer hover:opacity-60"
                 >
                   {title} <Sorter className="ml-auto" order={value} />
                 </div>
@@ -171,6 +196,38 @@ const Home: NextPage = () => {
               name: "amount",
             }),
         }),
+        table.createDataColumn((_, i) => i, {
+          id: "oprate",
+          cell: (info) => (
+            <div className="flex gap-2">
+              <button
+                className="btn btn-xs"
+                onClick={() => {
+                  setUpdateBillInfo({
+                    open: true,
+                    defaultValues: info.row.original,
+                  });
+                }}
+              >
+                修改
+              </button>
+
+              <button
+                className="btn btn-xs"
+                onClick={() => {
+                  setDeleteBillInfo({
+                    open: true,
+                    defaultValues: info.row.original,
+                  });
+                }}
+              >
+                删除
+              </button>
+            </div>
+          ),
+          footer: (props) => props.column.id,
+          header: "操作",
+        }),
       ];
     }, [categoryQuery.data, control, pageIndex, pageSize, submit]),
     pageCount: billListQuery.data?.pageCount ?? -1,
@@ -189,6 +246,111 @@ const Home: NextPage = () => {
     debugTable: true,
   });
 
+  const searchForm = (
+    <div className="border-base-300 bg-base-200 border grid grid-cols-4 gap-2 p-4">
+      <div className="form-control">
+        <label className="label">
+          <span className="label-text">账单类型</span>
+        </label>
+
+        <Controller
+          control={control}
+          name="type"
+          render={({ field: { value, onChange } }) => (
+            <StyledSelect
+              value={find(billTypeOptions, { value })}
+              options={billTypeOptions}
+              onChange={(v) => {
+                onChange(v?.value);
+                submit();
+              }}
+              isClearable
+              placeholder="请选择账单类型"
+            />
+          )}
+        />
+      </div>
+
+      <div className="form-control">
+        <label className="label">
+          <span className="label-text">账单分类</span>
+        </label>
+
+        <Controller
+          control={control}
+          name="categoryIds"
+          render={({ field: { value, onChange } }) => {
+            const categoryOptions = categoryQuery.data?.map((item) => ({
+              label: item.name,
+              value: item.id,
+            }));
+            const valueSet = new Set(value);
+
+            return (
+              <StyledSelect
+                value={categoryOptions?.filter((item) =>
+                  valueSet.has(item.value)
+                )}
+                options={categoryOptions}
+                onChange={(v) => {
+                  onChange(v?.map((item) => item.value));
+                  submit();
+                }}
+                isClearable
+                isMulti
+                placeholder="请选择账单分类"
+              />
+            );
+          }}
+        />
+      </div>
+
+      <div className="form-control">
+        <label className="label">
+          <span className="label-text">开始时间</span>
+
+          <ErrorMessage
+            errors={errors}
+            name="startTime"
+            render={({ message }) => (
+              <span className="label-text-alt text-error">{message}</span>
+            )}
+          />
+        </label>
+
+        <input
+          {...register("startTime", {
+            onChange: submit,
+          })}
+          type="datetime-local"
+          className="input"
+          placeholder="请选择开始时间"
+        />
+      </div>
+
+      <div className="form-control">
+        <label className="label">
+          <span className="label-text">结束时间</span>
+
+          <ErrorMessage
+            errors={errors}
+            name="endTime"
+            render={({ message }) => (
+              <span className="label-text-alt text-error">{message}</span>
+            )}
+          />
+        </label>
+
+        <input
+          {...register("endTime", { onChange: submit, deps: ["startTime"] })}
+          type="datetime-local"
+          className="input"
+          placeholder="请选择结束时间"
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-2">
       <Head>
@@ -197,129 +359,33 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="border-base-300 bg-base-200 border grid grid-cols-4 gap-2 p-4">
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text">账单类型</span>
-          </label>
+      {searchForm}
 
-          <Controller
-            control={control}
-            name="type"
-            render={({ field: { value, onChange } }) => (
-              <Select
-                instanceId="type-select"
-                value={find(billTypeOptions, { value })}
-                options={billTypeOptions}
-                onChange={(v) => {
-                  onChange(v?.value);
-                  submit();
-                }}
-                isClearable
-                placeholder="请选择账单类型"
-              />
-            )}
-          />
+      <div className="mt-4 mb-2 flex items-center">
+        <div>
+          当前所选账单分类和所选时间的总收入为{" "}
+          <span className="text-primary">
+            {billListQuery.data?.totalRevenue != null
+              ? formatMoney(billListQuery.data.totalRevenue)
+              : "-"}
+          </span>
+          ，总支出为
+          <span className="text-primary">
+            {" "}
+            {billListQuery.data?.totalExpenses != null
+              ? formatMoney(billListQuery.data.totalExpenses)
+              : "-"}
+          </span>
         </div>
 
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text">账单分类</span>
-          </label>
-
-          <Controller
-            control={control}
-            name="categoryIds"
-            render={({ field: { value, onChange } }) => {
-              const categoryOptions = categoryQuery.data?.map((item) => ({
-                label: item.name,
-                value: item.id,
-              }));
-              const valueSet = new Set(value);
-
-              return (
-                <Select
-                  instanceId="categoryIds-select"
-                  value={categoryOptions?.filter((item) =>
-                    valueSet.has(item.value)
-                  )}
-                  options={categoryOptions}
-                  onChange={(v) => {
-                    onChange(v?.map((item) => item.value));
-                    submit();
-                  }}
-                  isClearable
-                  isMulti
-                  placeholder="请选择账单分类"
-                />
-              );
-            }}
-          />
-        </div>
-
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text">开始时间</span>
-          </label>
-
-          <input
-            {...register("startTime", {
-              onChange: submit,
-            })}
-            type="datetime-local"
-            className="input input-bordered h-[38px] rounded"
-            placeholder="请选择开始时间"
-          />
-
-          <ErrorMessage
-            errors={errors}
-            name="startTime"
-            render={({ message }) => (
-              <label className="label">
-                <span className="label-text-alt text-error">{message}</span>
-              </label>
-            )}
-          />
-        </div>
-
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text">结束时间</span>
-          </label>
-
-          <input
-            {...register("endTime", { onChange: submit, deps: ["startTime"] })}
-            type="datetime-local"
-            className="input input-bordered h-[38px] rounded"
-            placeholder="请选择结束时间"
-          />
-
-          <ErrorMessage
-            errors={errors}
-            name="endTime"
-            render={({ message }) => (
-              <label className="label">
-                <span className="label-text-alt text-error">{message}</span>
-              </label>
-            )}
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 mb-2">
-        当前所选账单分类和所选时间的总收入为{" "}
-        <span className="text-primary">
-          {billListQuery.data?.totalRevenue != null
-            ? formatMoney(billListQuery.data.totalRevenue)
-            : "-"}
-        </span>
-        ，总支出为
-        <span className="text-primary">
-          {" "}
-          {billListQuery.data?.totalExpenses != null
-            ? formatMoney(billListQuery.data.totalExpenses)
-            : "-"}
-        </span>
+        <button
+          className="btn ml-auto"
+          onClick={() => {
+            setCreateBillVisible(true);
+          }}
+        >
+          创建账单
+        </button>
       </div>
       <div className="relative overflow-x-auto shadow-md sm:rounded-lg">
         <table className="table w-full">
@@ -328,15 +394,11 @@ const Home: NextPage = () => {
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <td
-                      key={header.id}
-                      colSpan={header.colSpan}
-                      className="text-sm text-bold"
-                    >
+                    <th key={header.id} colSpan={header.colSpan}>
                       {header.isPlaceholder ? null : (
                         <div>{header.renderHeader()}</div>
                       )}
-                    </td>
+                    </th>
                   );
                 })}
               </tr>
@@ -356,72 +418,76 @@ const Home: NextPage = () => {
         </table>
       </div>
 
-      <div className="flex items-center py-4 justify-end gap-2">
-        <button
-          className="btn"
-          onClick={() => instance.setPageIndex(0)}
-          disabled={!instance.getCanPreviousPage()}
-        >
-          {"<<"}
-        </button>
-        <button
-          className="btn"
-          onClick={() => instance.previousPage()}
-          disabled={!instance.getCanPreviousPage()}
-        >
-          {"<"}
-        </button>
-        <button
-          className="btn"
-          onClick={() => instance.nextPage()}
-          disabled={!instance.getCanNextPage()}
-        >
-          {">"}
-        </button>
-        <button
-          className="btn"
-          onClick={() => instance.setPageIndex(instance.getPageCount() - 1)}
-          disabled={!instance.getCanNextPage()}
-        >
-          {">>"}
-        </button>
+      <Pagination instance={instance} />
 
-        <span className="flex items-center gap-1">
-          <div>第</div>
-          <strong>{instance.getState().pagination.pageIndex + 1} 页</strong>
-        </span>
-        <span className="flex items-center gap-1">
-          <div>共</div>
-          <strong>{instance.getPageCount()}</strong> 页
-        </span>
-        <span className="flex items-center gap-1">
-          | 跳至:
-          <input
-            type="number"
-            defaultValue={instance.getState().pagination.pageIndex + 1}
-            onChange={(e) => {
-              const page = e.target.value ? Number(e.target.value) - 1 : 0;
-              instance.setPageIndex(page);
-            }}
-            className="input input-bordered input-sm w-20"
-            min={1}
-            max={instance.getPageCount()}
-          />
-          页
-        </span>
-        <select
-          value={instance.getState().pagination.pageSize}
-          onChange={(e) => {
-            instance.setPageSize(Number(e.target.value));
-          }}
-          className="select select-bordered select-sm"
-        >
-          {[10, 20, 30, 40, 50].map((pageSize) => (
-            <option key={pageSize} value={pageSize}>
-              {pageSize} 条/页
-            </option>
-          ))}
-        </select>
+      <div className={clsx("modal", createBillVisible && "modal-open")}>
+        <div className="modal-box bg-base-200">
+          <h3 className="font-bold text-lg mb-4">新增账单</h3>
+
+          {createBillVisible && (
+            <CreateBillForm
+              onCancel={() => {
+                setCreateBillVisible(false);
+              }}
+              onSuccess={() => {
+                setCreateBillVisible(false);
+                billListQuery.refetch();
+              }}
+            />
+          )}
+        </div>
+      </div>
+
+      <div className={clsx("modal", updateBillInfo.open && "modal-open")}>
+        <div className="modal-box bg-base-200">
+          <h3 className="font-bold text-lg mb-4">更新账单</h3>
+
+          {updateBillInfo.open && updateBillInfo.defaultValues && (
+            <UpdateBillForm
+              defaultValues={updateBillInfo.defaultValues}
+              onCancel={() => {
+                setUpdateBillInfo({
+                  open: false,
+                });
+              }}
+              onSuccess={() => {
+                setUpdateBillInfo({
+                  open: false,
+                });
+                billListQuery.refetch();
+              }}
+            />
+          )}
+        </div>
+      </div>
+
+      <div className={clsx("modal", deleteBillInfo.open && "modal-open")}>
+        <div className="modal-box">
+          <h3 className="font-bold text-lg">是否确定删除账单</h3>
+          <div className="modal-action">
+            <button
+              className="btn btn-outline"
+              onClick={() => {
+                setDeleteBillInfo({ open: false });
+              }}
+            >
+              取消
+            </button>
+            {deleteBillInfo.open && deleteBillInfo.defaultValues && (
+              <DeleteBillButton
+                defaultValues={deleteBillInfo.defaultValues}
+                onSuccess={() => {
+                  setDeleteBillInfo({
+                    open: false,
+                  });
+                  billListQuery.refetch();
+                }}
+              >
+                确定
+              </DeleteBillButton>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

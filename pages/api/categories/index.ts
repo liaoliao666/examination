@@ -5,11 +5,11 @@ import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse";
 import { isEmpty, pick } from "lodash-es";
-import { CategoryList } from "services/category/scheme";
+import { CategoryListResponse } from "lib/scheme/category";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<CategoryList>
+  res: NextApiResponse<CategoryListResponse>
 ) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);

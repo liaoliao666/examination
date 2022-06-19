@@ -1,7 +1,10 @@
 import prisma from "lib/prisma";
 import { BillType } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
-import { BillList, searchBillListArgsScheme } from "services/bill/scheme";
+import {
+  SearcBillListResponse,
+  searchBillListArgsScheme,
+} from "lib/scheme/bill";
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse";
@@ -9,7 +12,7 @@ import { isEmpty } from "lodash-es";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<BillList>
+  res: NextApiResponse<SearcBillListResponse>
 ) {
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
@@ -40,10 +43,10 @@ export default async function handler(
 
   if (!(await prisma.bill.count())) await initTable();
 
-  let list: BillList["list"];
-  let pageCount: BillList["pageCount"];
-  let totalExpenses: BillList["totalExpenses"];
-  let totalRevenue: BillList["totalRevenue"];
+  let list: SearcBillListResponse["list"];
+  let pageCount: SearcBillListResponse["pageCount"];
+  let totalExpenses: SearcBillListResponse["totalExpenses"];
+  let totalRevenue: SearcBillListResponse["totalRevenue"];
 
   await Promise.all([
     prisma.bill

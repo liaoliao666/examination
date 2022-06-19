@@ -1,32 +1,51 @@
+import { ServerError } from "lib/server-error";
+import { BizError } from "lib/biz-error";
 import { isEmpty } from "lodash-es";
-import { host } from "./host";
+
+function isServerError(err: any): err is ServerError {
+  return err instanceof Object && Object.hasOwn(err, "ret");
+}
+
+const request = (...args: Parameters<typeof fetch>) =>
+  fetch(...args).then(async (res) => {
+    const data = await res.json();
+
+    // 业务错误处理
+    if (isServerError(data)) {
+      throw new BizError(data.msg);
+    }
+
+    return data;
+  });
+
+export const host = "http://localhost:3000";
 
 export function POST<T extends any = unknown>(
   url: string,
   args: Record<string, any> = {}
 ): Promise<T> {
-  return fetch(`${host}${url}`, {
+  return request(`${host}${url}`, {
     body: JSON.stringify(args ?? {}),
     headers: new Headers({
       "Content-Type": "application/json",
       Accept: "application/json",
     }),
     method: "POST",
-  }).then((res) => res.json());
+  });
 }
 
 export function PUT<T extends any = unknown>(
   url: string,
   args: Record<string, any> = {}
 ): Promise<T> {
-  return fetch(`${host}${url}`, {
+  return request(`${host}${url}`, {
     body: JSON.stringify(args ?? {}),
     headers: new Headers({
       "Content-Type": "application/json",
       Accept: "application/json",
     }),
     method: "PUT",
-  }).then((res) => res.json());
+  });
 }
 
 export function GET<T extends any = unknown>(
@@ -44,10 +63,24 @@ export function GET<T extends any = unknown>(
       .join("&")}`;
   }
 
-  return fetch(`${host}${convertUrl}`, {
+  return request(`${host}${convertUrl}`, {
     headers: new Headers({
       "Content-Type": "application/json",
       Accept: "application/json",
     }),
-  }).then((res) => res.json());
+  });
+}
+
+export function DELETE<T extends any = unknown>(
+  url: string,
+  args: Record<string, any> = {}
+): Promise<T> {
+  return request(`${host}${url}`, {
+    body: JSON.stringify(args ?? {}),
+    headers: new Headers({
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    }),
+    method: "DELETE",
+  });
 }
